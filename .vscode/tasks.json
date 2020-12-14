@@ -19,6 +19,7 @@
 			"type": "npm",
 			"script": "compile:client",
 			"group": "build",
+			"isBackground": false,
 			"presentation": {
 				"panel": "dedicated",
 				"reveal": "never"
@@ -30,14 +31,19 @@
 		{
 			"type": "npm",
 			"script": "compile:server",
-			"group": "build",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
 			"presentation": {
 				"panel": "dedicated",
-				"reveal": "never"
+				"reveal": "always"
 			},
 			"problemMatcher": [
 				"$tsc"
-			]
+			],
+			"label": "npm: compile:server",
+			"detail": "tsc -p ./server/tsconfig.json"
 		},
 		{
 			"label": "watch",
@@ -51,10 +57,7 @@
 					"script": "watch:server"
 				}
 			],
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			},
+			"group": "build",
 			"problemMatcher": []
 		},
 		{

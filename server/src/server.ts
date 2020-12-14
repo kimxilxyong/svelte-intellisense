@@ -7,12 +7,14 @@ import {
 	CompletionItemKind,
     TextDocumentPositionParams,
     TextDocuments,
+    TextDocumentSyncKind,
     Hover,
-    Definition,
-    TextDocument
+    Definition
+   // TextDocument
 } from 'vscode-languageserver';
+import { TextDocument } from "vscode-languageserver-textdocument";
 
-import cosmic from 'cosmiconfig';
+import { cosmiconfigSync } from 'cosmiconfig';
 
 import { ConfigurationItem, ComponentMetadata, WorkspaceContext, ScopeContext, SlotMetadata } from './interfaces';
 import { SvelteDocument, SVELTE_VERSION_3 } from './SvelteDocument';
@@ -25,16 +27,22 @@ import { DocumentsCache } from './DocumentsCache';
 import { NodeModulesImportResolver } from './importResolvers/NodeModulesImportResolver';
 import { WebpackImportResolver } from './importResolvers/WebpackImportResolver';
 import { RollupImportResolver } from './importResolvers/RollupImportResolver';
+import { PackageImportResolver } from './importResolvers/PackageImportResolver';
 import { SvelteComponentDoc } from 'sveltedoc-parser/typings';
 
 // run babel for rollup config
-require('@babel/register')({ 
-    only: [ /rollup.config.js/ ], 
-    presets: [ "@babel/preset-env" ], 
+require('@babel/register')({
+    only: [ /rollup.config.js/ ],
+    presets: [ "@babel/preset-env" ],
     cwd: __dirname });
 
+// Create a connection for the server, using Node's IPC as a transport.
+// Also include all preview / proposed LSP features.
 let connection = createConnection(ProposedFeatures.all);
-let documents: TextDocuments = new TextDocuments();
+
+// Create a simple text document manager.
+let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
+
 
 const mappingConfigurations: Array<ConfigurationItem> = [
     {completionItemKind: CompletionItemKind.Field, metadataName: 'data', hasPublic: true},
@@ -55,7 +63,8 @@ connection.onInitialize(() => {
 			completionProvider: {
                 triggerCharacters: ['<', '.', ':', '#', '/', '@', '"', '|']
             },
-            textDocumentSync: documents.syncKind,
+            //textDocumentSync: documents.syncKind,
+            textDocumentSync: TextDocumentSyncKind.Full,
             hoverProvider : true,
             definitionProvider : true
 		}
@@ -65,8 +74,9 @@ connection.onInitialize(() => {
 const documentsCache: DocumentsCache = new DocumentsCache();
 
 
-const cosmicWebpack = cosmic('webpack', {packageProp: false });
-const cosmicRollup = cosmic('rollup', {packageProp: false });
+const cosmicWebpack = cosmiconfigSync('webpack', { packageProp: "main" });
+const cosmicRollup = cosmiconfigSync('rollup', { packageProp: "main" });
+
 
 documents.onDidChangeContent(change => {
     reloadDocument(change.document);
@@ -84,10 +94,10 @@ function reloadDocument(textDocument: TextDocument) {
     if (!document.document) {
         document.document = textDocument;
     }
-    
+
     document.content = textDocument.getText();
     document.sveltedoc = undefined;
-    
+
     parse({
         fileContent: document.content,
         ignoredVisibilities: [],
@@ -99,31 +109,35 @@ function reloadDocument(textDocument: TextDocument) {
         }
         if (document.importResolver === null) {
             try {
-                const { config } = cosmicWebpack.searchSync(document.path);
+                const { config } = cosmicWebpack.search(document.path);
                 if (config && config.resolve && config.resolve.alias) {
                     document.importResolver = new WebpackImportResolver(documentsCache, document.path, config.resolve.alias);
                 }
             }
-            catch {}
+            catch (er) {
+                //connection.console.log("cosmicWebpack:" + er.message);
+            }
             if (document.importResolver === null) {
-                try {                    
-                    const { config } = cosmicRollup.searchSync(document.path);
+                try {
+                    const { config } = cosmicRollup.search(document.path);
                     if (config && config.default && config.default.plugins) {
                         document.importResolver = new RollupImportResolver(documentsCache, document.path, config.default.plugins);
                     }
                 }
                 catch (er){
-                    //console.log(er);
+                    connection.console.log("cosmicRollup: " + er.message);
                 }
             }
+
             if (document.importResolver === null) {
-                document.importResolver = new NodeModulesImportResolver(documentsCache, document.path);
+                document.importResolver = new PackageImportResolver(documentsCache, document.path, "package");
             }
         }
         reloadDocumentImports(document, sveltedoc.components || []);
         reloadDocumentMetadata(document, sveltedoc);
-    }).catch(() => {
-        // supress error
+    }).catch((e) => {
+        connection.console.log(e.message);
+        connection.console.log(e.stack);
     });
 }
 
@@ -181,14 +195,14 @@ function reloadDocumentImports(document: SvelteDocument, components: any[]) {
     document.importedComponents = [];
 
     components.forEach(c => {
-        const importedDocument = document.importResolver.resolve(c.value);
+        const importedDocument = document.importResolver.resolve(c.value, c.name);
 
         if (importedDocument !== null) {
             document.importedComponents.push({name: c.name, filePath: importedDocument.path});
             if (!document.document) {
                 document.document = utils.createTextDocument(importedDocument.path);
             }
-            
+
             parse({
                 filename: importedDocument.path,
                 ignoredVisibilities: [],
@@ -196,16 +210,19 @@ function reloadDocumentImports(document: SvelteDocument, components: any[]) {
                 defaultVersion: SVELTE_VERSION_3
             }).then(sveltedoc => {
                     reloadDocumentMetadata(importedDocument, sveltedoc);
-            }).catch(() => {
-                // supress error
+            }).catch((e) => {
+                connection.console.log(e.message);
+                connection.console.log(e.stack);
             });
+        } else {
+            connection.console.log("File not found: " + c.value + " for component " + c.name);
         }
     });
 }
 
 const svelteDocumentService = new DocumentService();
 
-function executeActionInContext(_textDocumentPosition: TextDocumentPositionParams, 
+function executeActionInContext(_textDocumentPosition: TextDocumentPositionParams,
         action: (document: SvelteDocument, scopeContext: ScopeContext, workspaceContext: WorkspaceContext) => any) {
     // The pass parameter contains the position of the text document in
     // which code complete got requested. For the example we ignore this
@@ -249,13 +266,31 @@ connection.onCompletion(
 );
 
 // This handler provides the hover information.
-connection.onHover(
-    (_textDocumentPosition: TextDocumentPositionParams) : Hover => {
-        return executeActionInContext(_textDocumentPosition, (document, scopeContext, workspaceContext) => {
-            return svelteDocumentService.getHover(document, scopeContext, workspaceContext);
-        });
-    }
+//connection.onHover((_textDocumentPosition: TextDocumentPositionParams): Hover => {
+//        return executeActionInContext(_textDocumentPosition, (document, scopeContext, workspaceContext) => {
+//            return svelteDocumentService.getHover(document, scopeContext, workspaceContext);
+//        });
+//    }
+//);
+// This handler provides the hover information.
+connection.onHover((_textDocumentPosition: TextDocumentPositionParams): Hover => {
+
+    const hoverResult = executeActionInContext(_textDocumentPosition, (document, scopeContext, workspaceContext) => {
+
+        const result = svelteDocumentService.getHover(document, scopeContext, workspaceContext);
+
+        return result;
+    });
+    return hoverResult;
+}
 );
+/*
+connection.onHover(() => {
+    return {
+        contents: "Hello World"
+    };
+});
+*/
 
 connection.onDefinition(
     (_textDocumentPosition: TextDocumentPositionParams) : Definition => {

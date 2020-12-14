@@ -86,18 +86,27 @@ export function pathToFileUri (filePath) {
     return `file://${head}/${parts.map(encodeURIComponent).join('/')}`;
 }
 
-/** 
- * Checks if svelte file (with .svelte or .html extension) exists based on a given file path and returns its real path. 
+/**
+ * Checks if svelte file (with .svelte or .html extension) exists based on a given file path and returns its real path.
  * @param {String} filepath File path with or without extension.
  * @returns {String} Full file path with extension. null if file not found.
  */
 export function findSvelteFile(filepath: string) {
+
+    if (!filepath) {
+        return null;
+    }
+
     for (let index = 0; index < svelteFileExtensions.length; index++) {
         const extension = svelteFileExtensions[index];
         if (extension === '' || !filepath.endsWith(extension)) {
             const svelteFilePath = filepath + extension;
             if (fs.existsSync(svelteFilePath)) {
-                return svelteFilePath;
+                // changed by Kim 2020-10-13
+                // check if path is a directory
+                if (!fs.lstatSync(svelteFilePath).isDirectory()) {
+                    return svelteFilePath;
+                }
             }
         }
     }
@@ -105,8 +114,8 @@ export function findSvelteFile(filepath: string) {
     return null;
 }
 
-/** 
- * Checks if svelte file (with .svelte or .html extension) exists based on a given file path and returns document from cache. 
+/**
+ * Checks if svelte file (with .svelte or .html extension) exists based on a given file path and returns document from cache.
  * @param {String} filepath File path with or without extension.
  * @param {DocumentsCache} documentsCache Documents cache to search in.
  * @returns {SvelteDocument} Document from cache, null if not found.

@@ -2,7 +2,22 @@
 {
 	"version": "0.2.0",
     "configurations": [
-        {
+    {
+        "name": "Launch test.js",
+        "program": "${workspaceFolder}/server/test.js",
+        "request": "launch",
+        "skipFiles": [
+            "<node_internals>/**"
+        ],
+        "type": "pwa-node"
+    },
+    {
+        "command": "npm run compile:server",
+        "name": "Compile Server",
+        "request": "launch",
+        "type": "node-terminal"
+    },
+    {
             "name": "Launch Client",
             "type": "extensionHost",
             "request": "launch",

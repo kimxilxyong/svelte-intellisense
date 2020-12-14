@@ -9,5 +9,9 @@
     // Turn off tsc task auto detection since we have the necessary tasks as npm scripts
     "typescript.tsc.autoDetect": "off",
     "npm.exclude": ["**/client", "**/server"],
-	"npm.enableScriptExplorer": true
+    "npm.enableScriptExplorer": true,
+    "svelte.language-server.ls-path": "/home/moe/source/svelte-intellisense/server/out/server.js",
+    "svelte.language-server.port": 6010,
+    "svelte.language-server.runtime": "/home/moe/.nvm/versions/node/v14.4.0/bin/node",
+    "svelte-intellisense.trace.server": "verbose",
 }

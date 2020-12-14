@@ -54,12 +54,12 @@ export interface GenericScopeContext<TData> {
     content: string;
     offset: number;
     data?: TData;
-    
+
     documentOffset: number;
 }
 
 export interface ScopeContext extends GenericScopeContext<any> {
-    
+
 }
 
 export interface WorkspaceContext {
@@ -67,6 +67,6 @@ export interface WorkspaceContext {
 }
 
 export interface ImportResolver {
-    resolve(importee: string): SvelteDocument;
+    resolve(importee: string, component?: string): SvelteDocument;
     resolvePath(partialPath: string): string;
 }

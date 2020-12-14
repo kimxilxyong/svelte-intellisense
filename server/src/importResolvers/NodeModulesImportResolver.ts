@@ -7,7 +7,13 @@ import { SvelteDocument } from "../SvelteDocument";
 
 export class NodeModulesImportResolver implements ImportResolver {
     private baseDocumentPath: string;
-    private nodeModulesPath: string;
+    private _nodeModulesPath: string;
+    public get nodeModulesPath(): string {
+        return this._nodeModulesPath;
+    }
+    public set nodeModulesPath(value: string) {
+        this._nodeModulesPath = value;
+    }
 
     constructor(protected documentsCache: DocumentsCache, protected documentPath: string) {
         this.baseDocumentPath = path.dirname(documentPath)
@@ -21,7 +27,7 @@ export class NodeModulesImportResolver implements ImportResolver {
         if (importedDocument === null) {
             importFilePath = utils.findSvelteFile(importFilePath);
             if (importFilePath !== null) {
-                importedDocument = this.documentsCache.getOrCreateDocumentFromCache(importFilePath);                        
+                importedDocument = this.documentsCache.getOrCreateDocumentFromCache(importFilePath);
             } else if (this.nodeModulesPath) {
                 const moduleFilePath = utils.findSvelteFile(path.resolve(this.nodeModulesPath, importee));
                 if (moduleFilePath !== null) {
@@ -39,7 +45,7 @@ export class NodeModulesImportResolver implements ImportResolver {
 
             if (fs.existsSync(searchFolderPath)) {
                 return searchFolderPath;
-            }    
+            }
         } else if (!partialPath.startsWith('.')) {
             // Search in node modules folder
             if (this.nodeModulesPath) {
@@ -48,7 +54,7 @@ export class NodeModulesImportResolver implements ImportResolver {
                 if (fs.existsSync(searchFolderPath)) {
                     return searchFolderPath;
                 }
-            }  
+            }
         }
 
         return null;

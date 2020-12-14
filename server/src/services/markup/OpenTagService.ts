@@ -24,7 +24,7 @@ export class OpenTagService extends BaseService {
         const tagContent = context.content.substring(openIndex, context.offset);
 
         const match = /<([\w\d_]+:)?[\w\d_]*$/g.exec(tagContent);
-        
+
         const versionsSpecific = [
             { version: SVELTE_VERSION_2, specific: svelte2SpecialComponents },
             { version: SVELTE_VERSION_3, specific: svelte3SpecialComponents}
@@ -41,9 +41,9 @@ export class OpenTagService extends BaseService {
                 return [
                     ...document.metadata.components
                         .map(cloneCompletionItem)
-                        .map(item => { 
+                        .map(item => {
                             item.documentation = <MarkupContent>getImportedComponentDocumentation(item.label, document, workspace).contents;
-                            
+
                             return item;
                         }),
                     ...svelte2SpecialComponents
@@ -80,7 +80,7 @@ export class OpenTagService extends BaseService {
         if (spaceIndex > 0 && spaceIndex < context.offset) {
             return null;
         }
-
-        return context.content.substring(openIndex + 1, spaceIndex);
+        const tagContent = context.content.substring(openIndex + 1, spaceIndex);
+        return tagContent;
     }
 }
